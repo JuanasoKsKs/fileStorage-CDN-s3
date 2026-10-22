@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"errors"
 )
 
 func (cfg apiConfig) ensureAssetsDir() error {
@@ -9,4 +10,18 @@ func (cfg apiConfig) ensureAssetsDir() error {
 		return os.Mkdir(cfg.assetsRoot, 0755)
 	}
 	return nil
+}
+
+func (cfg *apiConfig) MediaTypeToExt(mediaType string) (string, error) {
+	var ext string
+	var err error
+	switch mediaType {
+	case "image/jpeg":
+		ext = "jpg"
+	case "image/png":
+		ext = "png"
+	default:
+		return "", errors.New("Invalid format")
+	}
+	return ext, err
 }

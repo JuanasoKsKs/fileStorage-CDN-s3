@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
+	"mime"
+	"crypto/rand"
 	"encoding/base64"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
@@ -10,6 +13,7 @@ import (
 
 	"errors"
 	"io"
+	"os"
 )
 
 func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Request) {
@@ -33,6 +37,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	}
 
 	fmt.Println("uploading thumbnail for video", videoID, "by user", userID)
+
 	// TODO: implement the upload here
 	const MaxMemory = 10 << 20
 	r.ParseMultipartForm(MaxMemory)
@@ -42,12 +47,18 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	defer file.Close()
-	mediaType := header.Header.Get("Content-Type")
-	buffer, err := io.ReadAll(file)
+	mediaType, _, err := mime.ParseMediaType(header.Header.Get("Content-Type"))
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Unable to read file", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid Content-Type", err)
 		return
 	}
+
+	ext, err := cfg.MediaTypeToExt(mediaType)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Unsuported image format", err)
+		return
+	}
+
 	videoDB, err := cfg.db.GetVideo(videoID)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Failed getting the video", err)
@@ -57,10 +68,25 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "Unauthorized", errors.New("User doesn't have access"))
 		return
 	}
-	
 
-	encodedString := base64.StdEncoding.EncodeToString(buffer)
-	dataURL := fmt.Sprintf("data:%v;base64,%v", mediaType, encodedString)
+	key := make([]byte, 32)
+	rand.Read(key)
+	encoded := base64.RawURLEncoding.EncodeToString(key)
+
+	filePath := fmt.Sprintf("%v.%v", encoded,ext)
+	fileCreated, err := os.Create(filepath.Join(cfg.assetsRoot, filePath))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "unable to create file", err)
+		return
+	}
+	defer fileCreated.Close()
+	_, err = io.Copy(fileCreated, file)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "unable copy to file", err)
+		return
+	}
+
+	dataURL := fmt.Sprintf("http://localhost:%v/assets/%v", cfg.port, filePath)
 	videoDB.ThumbnailURL = &dataURL
 
 	err = cfg.db.UpdateVideo(videoDB)
