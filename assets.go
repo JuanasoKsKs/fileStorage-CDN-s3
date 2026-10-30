@@ -20,6 +20,8 @@ func (cfg *apiConfig) MediaTypeToExt(mediaType string) (string, error) {
 		ext = "jpg"
 	case "image/png":
 		ext = "png"
+	case "video/mp4":
+		ext = "mp4"
 	default:
 		return "", errors.New("Invalid format")
 	}

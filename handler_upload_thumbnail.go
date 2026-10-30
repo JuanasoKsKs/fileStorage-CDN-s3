@@ -65,7 +65,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	if userID != videoDB.UserID {
-		respondWithError(w, http.StatusUnauthorized, "Unauthorized", errors.New("User doesn't have access"))
+		respondWithError(w, http.StatusUnauthorized, "Not the owner", errors.New("User doesn't have access"))
 		return
 	}
 
@@ -91,7 +91,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
 	err = cfg.db.UpdateVideo(videoDB)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Unable to update the vido", err)
+		respondWithError(w, http.StatusBadRequest, "Unable to update the video", err)
 		return
 	}
 
