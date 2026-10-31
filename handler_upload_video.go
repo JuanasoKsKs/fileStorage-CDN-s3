@@ -91,15 +91,41 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 
 	}
 	
+	newPath, err := processVideoForFastStart(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Unable to create path", err)
+		return
+	}
+	fastFileStart, err := os.Open(newPath)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Unable to open new file", err)
+		return
+	}
+	defer fastFileStart.Close()
+	defer os.Remove(fastFileStart.Name())
 
 	key := make([]byte, 32)
 	rand.Read(key)
 	encodedStr := hex.EncodeToString(key)
-	keyFormated := fmt.Sprintf("%s.%s", encodedStr, ext)
+
+	scale, err := getVideoAspectRatio(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Unable to get ratio", err)
+		return
+	}
+	ratio := "other"
+	if scale == "16/9"{
+		ratio = "landscape"
+	}
+	if scale == "9/16" {
+		ratio = "portrait"
+	}
+
+	keyFormated := fmt.Sprintf("%s/%s.%s", ratio, encodedStr, ext)
 	_, err = cfg.s3Client.PutObject(r.Context(), &s3.PutObjectInput{
 		Bucket:			&cfg.s3Bucket,
 		Key:			&keyFormated,
-		Body:			tempFile,
+		Body:			fastFileStart,
 		ContentType:	&mediaType,
 	})
 	if err != nil {
